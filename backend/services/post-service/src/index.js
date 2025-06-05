@@ -1,4 +1,5 @@
 import express from 'express';
+import dotenv from 'dotenv';
 import { ApolloServer } from 'apollo-server-express';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -11,11 +12,42 @@ import { loadFilesSync } from '@graphql-tools/load-files';
 import { mergeTypeDefs, mergeResolvers } from '@graphql-tools/merge';
 import { makeExecutableSchema } from '@graphql-tools/schema';
 import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
 import { setupLogger } from 'threads-clone-shared/utils/logger.js';
+import { join } from 'path';
+import postResolvers from './resolvers/post.resolvers.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { existsSync } from 'fs';
+
+// Get current directory
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Debug: Log file paths and existence
+const envPath = join(__dirname, '..', '.env');
+console.log('\n=== Post Service Environment Debug ===');
+console.log('Current directory:', __dirname);
+console.log('Looking for .env at:', envPath);
+console.log('.env file exists:', existsSync(envPath));
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: envPath });
+
+// Debug: Log all environment variables
+console.log('\nEnvironment variables loaded:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('MONGODB_URI:', process.env.MONGODB_URI);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '***exists***' : '***missing***');
+console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
+console.log('LOG_LEVEL:', process.env.LOG_LEVEL);
+console.log('=====================================\n');
+
+// Validate required environment variables
+if (!process.env.JWT_SECRET || !process.env.MONGODB_URI) {
+  console.error('❌ Required environment variables are missing. Check .env file.');
+  process.exit(1);
+}
 
 const logger = setupLogger('post-service');
 
@@ -42,11 +74,10 @@ app.get('/health', (req, res) => {
 });
 
 // Load GraphQL schema and resolvers
-const typesArray = loadFilesSync('./src/schema/**/*.graphql');
-const resolversArray = loadFilesSync('./src/resolvers/**/*.js');
+const typesArray = loadFilesSync(join(__dirname, './schema/**/*.graphql'));
 
 const typeDefs = mergeTypeDefs(typesArray);
-const resolvers = mergeResolvers(resolversArray);
+const resolvers = mergeResolvers([postResolvers]);
 
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 

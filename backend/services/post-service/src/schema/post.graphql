@@ -1,12 +1,12 @@
 type Post {
   id: ID!
-  author: User!
+  author: ID!
   content: String!
   media: [Media!]
-  likes: [User!]!
+  likes: [ID!]!
   comments: [Comment!]!
   shares: [Share!]!
-  mentions: [User!]!
+  mentions: [ID!]!
   hashtags: [String!]!
   location: Location
   isPrivate: Boolean!
@@ -14,7 +14,7 @@ type Post {
   editedAt: String
   isDeleted: Boolean!
   deletedAt: String
-  parentPost: Post
+  parentPost: ID
   likeCount: Int!
   commentCount: Int!
   shareCount: Int!
@@ -24,18 +24,18 @@ type Post {
 
 type Comment {
   id: ID!
-  post: Post!
-  author: User!
+  post: ID!
+  author: ID!
   content: String!
-  likes: [User!]!
+  likes: [ID!]!
   replies: [Comment!]!
-  mentions: [User!]!
+  mentions: [ID!]!
   hashtags: [String!]!
   isEdited: Boolean!
   editedAt: String
   isDeleted: Boolean!
   deletedAt: String
-  parentComment: Comment
+  parentComment: ID
   likeCount: Int!
   replyCount: Int!
   createdAt: String!
@@ -52,7 +52,7 @@ type Media {
 }
 
 type Share {
-  user: User!
+  user: ID!
   sharedAt: String!
 }
 

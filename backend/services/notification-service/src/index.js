@@ -17,16 +17,40 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { setupLogger } from 'threads-clone-shared/utils/logger.js';
 import { errorHandler } from 'threads-clone-shared/utils/errors.js';
-
-// Load environment variables
-dotenv.config();
-
-// Setup logger
-const logger = setupLogger('notification-service');
+import { existsSync } from 'fs';
 
 // Get current directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Debug: Log file paths and existence
+const envPath = join(__dirname, '..', '.env');
+console.log('\n=== Notification Service Environment Debug ===');
+console.log('Current directory:', __dirname);
+console.log('Looking for .env at:', envPath);
+console.log('.env file exists:', existsSync(envPath));
+
+// Load environment variables
+dotenv.config({ path: envPath });
+
+// Debug: Log all environment variables
+console.log('\nEnvironment variables loaded:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('MONGODB_URI:', process.env.MONGODB_URI);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '***exists***' : '***missing***');
+console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
+console.log('LOG_LEVEL:', process.env.LOG_LEVEL);
+console.log('=====================================\n');
+
+// Validate required environment variables
+if (!process.env.JWT_SECRET || !process.env.MONGODB_URI) {
+  console.error('❌ Required environment variables are missing. Check .env file.');
+  process.exit(1);
+}
+
+// Setup logger
+const logger = setupLogger('notification-service');
 
 // Create Express app
 const app = express();
@@ -60,10 +84,10 @@ mongoose.connect(process.env.MONGODB_URI)
 
 // Load GraphQL schema and resolvers
 const typesArray = loadFilesSync(join(__dirname, './schema/**/*.graphql'));
-const resolversArray = loadFilesSync(join(__dirname, './resolvers/**/*.js'));
+import notificationResolvers from './resolvers/notification.resolvers.js';
 
 const typeDefs = mergeTypeDefs(typesArray);
-const resolvers = mergeResolvers(resolversArray);
+const resolvers = mergeResolvers([notificationResolvers]);
 
 // Create executable schema
 const schema = makeExecutableSchema({ typeDefs, resolvers });

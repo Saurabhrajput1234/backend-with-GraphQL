@@ -1,5 +1,17 @@
 import mongoose from 'mongoose';
 
+const readReceiptSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: 'User'
+  },
+  readAt: {
+    type: String,
+    required: true
+  }
+});
+
 const messageSchema = new mongoose.Schema({
   chat: {
     type: mongoose.Schema.Types.ObjectId,
@@ -19,23 +31,14 @@ const messageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'file'],
-    default: 'text'
+    enum: ['TEXT', 'IMAGE', 'FILE'],
+    default: 'TEXT'
   },
   fileUrl: {
     type: String,
     trim: true
   },
-  readBy: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    readAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  readBy: [readReceiptSchema],
   isDeleted: {
     type: Boolean,
     default: false
@@ -54,14 +57,14 @@ const messageSchema = new mongoose.Schema({
 // Indexes
 messageSchema.index({ chat: 1, createdAt: -1 });
 messageSchema.index({ sender: 1 });
-messageSchema.index({ 'readBy.user': 1 });
+messageSchema.index({ replyTo: 1 });
 
 // Method to mark message as read
 messageSchema.methods.markAsRead = async function(userId) {
-  if (!this.readBy.some(read => read.user.toString() === userId.toString())) {
+  if (!this.readBy.some(read => read.userId.toString() === userId.toString())) {
     this.readBy.push({
-      user: userId,
-      readAt: new Date()
+      userId: userId,
+      readAt: new Date().toISOString()
     });
     await this.save();
   }

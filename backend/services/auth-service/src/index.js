@@ -1,4 +1,7 @@
+// src/index.js
+
 import express from 'express';
+import dotenv from 'dotenv';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { createServer } from 'http';
@@ -9,208 +12,192 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { loadFilesSync } from '@graphql-tools/load-files';
 import { mergeTypeDefs, mergeResolvers } from '@graphql-tools/merge';
 import jwt from 'jsonwebtoken';
+import { existsSync } from 'fs';
 
 import { setupLogger } from 'threads-clone-shared/utils/logger.js';
 import { errorHandler } from 'threads-clone-shared/utils/errors.js';
 
-// Load environment variables
-dotenv.config();
-
+// === Setup === //
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Initialize logger
+// Debug: Log file paths and existence
+const envPath = join(__dirname, '..', '.env');
+console.log('\n=== Auth Service Environment Debug ===');
+console.log('Current directory:', __dirname);
+console.log('Looking for .env at:', envPath);
+console.log('.env file exists:', existsSync(envPath));
+
+// Try loading .env file directly
+try {
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.error('Error loading .env file:', result.error);
+  } else {
+    console.log('Successfully loaded .env file');
+  }
+} catch (error) {
+  console.error('Exception while loading .env file:', error);
+}
+
+// Debug: Log all environment variables
+console.log('\nEnvironment variables loaded:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', process.env.PORT);
+console.log('MONGODB_URI:', process.env.MONGODB_URI);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '***exists***' : '***missing***');
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+console.log('LOG_LEVEL:', process.env.LOG_LEVEL);
+console.log('=====================================\n');
+
+// Validate required environment variables
+if (!process.env.JWT_SECRET || !process.env.MONGODB_URI) {
+  console.error('❌ Required environment variables are missing. Check .env file.');
+  console.error('Current .env path:', envPath);
+  console.error('File exists:', existsSync(envPath));
+  console.error('Current working directory:', process.cwd());
+  process.exit(1);
+}
+
+// Logger
 const logger = setupLogger('auth-service');
 
-// MongoDB connection options
-const mongooseOptions = {
+// === MongoDB Connection === //
+mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-};
+}).then(() => {
+  logger.info('✅ Connected to MongoDB');
+}).catch((err) => {
+  logger.error('❌ MongoDB connection error:', err);
+  process.exit(1);
+});
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, mongooseOptions)
-  .then(() => logger.info('Connected to MongoDB'))
-  .catch(err => {
-    logger.error('MongoDB connection error:', err);
-    process.exit(1);
-  });
-
-// Create Express app
+// === Express Setup === //
 const app = express();
 
-// CORS options
 const corsOptions = {
-  origin: process.env.FRONTEND_URL,
+  origin: process.env.FRONTEND_URL || '*',
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
   crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }
 }));
 app.use(cors(corsOptions));
 app.use(express.json());
-app.use(morgan('combined', { 
-  stream: { 
-    write: message => logger.info(message.trim()) 
-  },
-  skip: (req) => req.path === '/health' // Skip logging for health checks
+app.use(morgan('combined', {
+  stream: { write: msg => logger.info(msg.trim()) },
+  skip: req => req.path === '/health'
 }));
 
-// Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Load GraphQL schema and resolvers
-const typesArray = loadFilesSync(join(__dirname, './schema/**/*.graphql'));
-const resolversArray = loadFilesSync(join(__dirname, './resolvers/**/*.js'));
+// === GraphQL Schema === //
+const typeDefs = mergeTypeDefs(loadFilesSync(join(__dirname, './schema/**/*.graphql')));
+import authResolvers from './resolvers/auth.resolvers.js';
+const resolvers = mergeResolvers([authResolvers]);
 
-const typeDefs = mergeTypeDefs(typesArray);
-const resolvers = mergeResolvers(resolversArray);
-
-// Create executable schema
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
-// Create Apollo Server
+// === Apollo Server === //
 const server = new ApolloServer({
   schema,
   context: async ({ req }) => {
-    try {
-      // Get token from header
-      const token = req.headers.authorization?.split(' ')[1];
-      
-      // Verify token and get user
-      let user = null;
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          user = { id: decoded.id };
-        } catch (error) {
-          logger.warn('Token verification failed:', error.message);
-        }
+    const token = req.headers.authorization?.split(' ')[1];
+    let user = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = { id: decoded.id };
+      } catch (err) {
+        logger.warn('Token verification failed:', err.message);
       }
-
-      return { user };
-    } catch (error) {
-      logger.error('Context creation error:', error);
-      return { user: null };
     }
+    return { user };
   },
   formatError: (error) => {
-    // Log the error
     logger.error('GraphQL Error:', {
       message: error.message,
       path: error.path,
       extensions: error.extensions
     });
-
-    // Don't expose internal errors to clients
-    if (error.extensions?.code === 'INTERNAL_SERVER_ERROR') {
-      return {
-        message: 'Internal server error',
-        path: error.path,
-        extensions: { code: 'INTERNAL_SERVER_ERROR' }
-      };
-    }
-
-    return error;
+    return error.extensions?.code === 'INTERNAL_SERVER_ERROR'
+      ? { message: 'Internal server error', path: error.path, extensions: { code: 'INTERNAL_SERVER_ERROR' } }
+      : error;
   }
 });
 
-// Start Apollo Server
 await server.start();
 
-// Apply Apollo middleware
 app.use('/graphql', expressMiddleware(server, {
   cors: corsOptions,
   context: async ({ req }) => {
-    try {
-      const token = req.headers.authorization?.split(' ')[1];
-      let user = null;
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          user = { id: decoded.id };
-        } catch (error) {
-          logger.warn('Token verification failed:', error.message);
-        }
+    const token = req.headers.authorization?.split(' ')[1];
+    let user = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = { id: decoded.id };
+      } catch (err) {
+        logger.warn('Token verification failed:', err.message);
       }
-      return { user };
-    } catch (error) {
-      logger.error('Context creation error:', error);
-      return { user: null };
     }
+    return { user };
   }
 }));
 
-// Create HTTP server
+// === HTTP and WebSocket Servers === //
 const httpServer = createServer(app);
 
-// Create WebSocket server
 const wsServer = new WebSocketServer({
   server: httpServer,
   path: '/graphql'
 });
 
-// Use WebSocket server for GraphQL subscriptions
-useServer({ 
+useServer({
   schema,
   context: async (ctx) => {
-    try {
-      // Handle both lowercase and uppercase Authorization header
-      const authHeader = ctx.connectionParams?.authorization || ctx.connectionParams?.Authorization;
-      const token = authHeader?.split(' ')[1];
-      let user = null;
-      if (token) {
-        try {
-          const decoded = jwt.verify(token, process.env.JWT_SECRET);
-          user = { id: decoded.id };
-        } catch (error) {
-          logger.warn('WebSocket token verification failed:', error.message);
-        }
+    const authHeader = ctx.connectionParams?.authorization || ctx.connectionParams?.Authorization;
+    const token = authHeader?.split(' ')[1];
+    let user = null;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        user = { id: decoded.id };
+      } catch (err) {
+        logger.warn('WS token verification failed:', err.message);
       }
-      return { user };
-    } catch (error) {
-      logger.error('WebSocket context creation error:', error);
-      return { user: null };
     }
+    return { user };
   }
 }, wsServer);
 
-// Remove duplicate error handler since it's imported from shared utils
-// Apply error handling middleware
+// === Error Handling === //
 app.use(errorHandler);
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection:', reason);
   process.exit(1);
 });
 
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-// Start server
+// === Start Server === //
 const PORT = process.env.PORT || 4001;
 httpServer.listen(PORT, () => {
-  logger.info(`Auth service running on port ${PORT}`);
-  logger.info(`GraphQL endpoint: http://localhost:${PORT}/graphql`);
-  logger.info(`WebSocket endpoint: ws://localhost:${PORT}/graphql`);
-  logger.info(`Health check endpoint: http://localhost:${PORT}/health`);
-}); 
+  logger.info(`🚀 Auth service running at http://localhost:${PORT}/graphql`);
+  logger.info(`📡 WS Subscriptions at ws://localhost:${PORT}/graphql`);
+  logger.info(`💓 Health check at http://localhost:${PORT}/health`);
+});

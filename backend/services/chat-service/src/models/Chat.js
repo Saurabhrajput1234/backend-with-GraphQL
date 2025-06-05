@@ -1,35 +1,43 @@
 import mongoose from 'mongoose';
 
+const unreadCountSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
+    ref: 'User'
+  },
+  count: {
+    type: Number,
+    default: 0
+  }
+});
+
 const chatSchema = new mongoose.Schema({
   participants: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    required: true,
+    ref: 'User'
   }],
   type: {
     type: String,
-    enum: ['direct', 'group'],
-    default: 'direct'
+    enum: ['DIRECT', 'GROUP'],
+    required: true
   },
   name: {
     type: String,
-    trim: true,
-    maxlength: [100, 'Chat name cannot exceed 100 characters']
+    required: function() {
+      return this.type === 'GROUP';
+    }
   },
   lastMessage: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'
   },
-  unreadCounts: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    count: {
-      type: Number,
-      default: 0
-    }
-  }],
+  unreadCounts: [unreadCountSchema],
+  messageCount: {
+    type: Number,
+    default: 0
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -40,8 +48,7 @@ const chatSchema = new mongoose.Schema({
 
 // Indexes
 chatSchema.index({ participants: 1 });
-chatSchema.index({ 'unreadCounts.user': 1 });
-chatSchema.index({ lastMessage: 1 });
+chatSchema.index({ type: 1, participants: 1 }, { unique: true, sparse: true });
 
 // Virtual for message count
 chatSchema.virtual('messageCount', {

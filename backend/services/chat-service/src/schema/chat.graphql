@@ -1,6 +1,6 @@
 type Chat {
   id: ID!
-  participants: [User!]!
+  participants: [ID!]!
   type: ChatType!
   name: String
   lastMessage: Message
@@ -13,26 +13,26 @@ type Chat {
 
 type Message {
   id: ID!
-  chat: Chat!
-  sender: User!
+  chat: ID!
+  sender: ID!
   content: String!
   type: MessageType!
   fileUrl: String
   readBy: [ReadReceipt!]!
   isDeleted: Boolean!
   deletedAt: String
-  replyTo: Message
+  replyTo: ID
   createdAt: String!
   updatedAt: String!
 }
 
 type UnreadCount {
-  user: User!
+  userId: ID!
   count: Int!
 }
 
 type ReadReceipt {
-  user: User!
+  userId: ID!
   readAt: String!
 }
 

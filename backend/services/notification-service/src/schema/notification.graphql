@@ -1,12 +1,12 @@
 type Notification {
   id: ID!
-  recipient: User!
-  sender: User
+  recipient: ID!
+  sender: ID
   type: NotificationType!
-  post: Post
-  comment: Comment
-  chat: Chat
-  message: Message
+  post: ID
+  comment: ID
+  chat: ID
+  message: ID
   isRead: Boolean!
   createdAt: String!
   updatedAt: String!

@@ -17,9 +17,7 @@ const resolvers = {
           .sort({ updatedAt: -1 })
           .limit(limit)
           .skip(offset)
-          .populate('participants', 'id username fullName avatar')
-          .populate('lastMessage')
-          .populate('unreadCounts.user', 'id username');
+          .populate('lastMessage');
 
         return chats;
       } catch (error) {
@@ -35,10 +33,7 @@ const resolvers = {
         const chat = await Chat.findOne({
           _id: id,
           participants: user.id
-        })
-          .populate('participants', 'id username fullName avatar')
-          .populate('lastMessage')
-          .populate('unreadCounts.user', 'id username');
+        }).populate('lastMessage');
 
         if (!chat) throw new UserInputError('Chat not found');
         return chat;
@@ -64,9 +59,7 @@ const resolvers = {
           .sort({ createdAt: -1 })
           .limit(limit)
           .skip(offset)
-          .populate('sender', 'id username fullName avatar')
-          .populate('replyTo')
-          .populate('readBy.user', 'id username');
+          .populate('replyTo');
 
         return messages.reverse();
       } catch (error) {
@@ -79,12 +72,11 @@ const resolvers = {
       if (!user) throw new AuthenticationError('Not authenticated');
 
       try {
-        const chats = await Chat.find({ participants: user.id })
-          .populate('unreadCounts.user', 'id username');
+        const chats = await Chat.find({ participants: user.id });
 
         return chats.map(chat => ({
-          chat: chat._id,
-          count: chat.unreadCounts.find(uc => uc.user._id.toString() === user.id)?.count || 0
+          userId: user.id,
+          count: chat.unreadCounts.find(uc => uc.userId.toString() === user.id)?.count || 0
         }));
       } catch (error) {
         logger.error('Error fetching unread counts:', error);
@@ -121,8 +113,6 @@ const resolvers = {
           name: type === 'DIRECT' ? null : name
         });
 
-        await chat.populate('participants', 'id username fullName avatar');
-
         pubsub.publish('CHAT_CREATED', {
           chatCreated: chat
         });
@@ -156,10 +146,9 @@ const resolvers = {
           type,
           fileUrl,
           replyTo: replyToId,
-          readBy: [{ user: user.id }] // Mark as read by sender
+          readBy: [{ userId: user.id, readAt: new Date().toISOString() }] // Mark as read by sender
         });
 
-        await message.populate('sender', 'id username fullName avatar');
         if (replyToId) {
           await message.populate('replyTo');
         }
@@ -172,12 +161,12 @@ const resolvers = {
         for (const participant of chat.participants) {
           if (participant.toString() !== user.id) {
             const unreadCount = chat.unreadCounts.find(uc => 
-              uc.user.toString() === participant.toString()
+              uc.userId.toString() === participant.toString()
             );
             if (unreadCount) {
               unreadCount.count += 1;
             } else {
-              chat.unreadCounts.push({ user: participant, count: 1 });
+              chat.unreadCounts.push({ userId: participant, count: 1 });
             }
           }
         }
@@ -213,9 +202,7 @@ const resolvers = {
         Object.assign(chat, input);
         await chat.save();
 
-        await chat.populate('participants', 'id username fullName avatar');
         await chat.populate('lastMessage');
-        await chat.populate('unreadCounts.user', 'id username');
 
         pubsub.publish('CHAT_UPDATED', {
           chatUpdated: chat
@@ -241,32 +228,12 @@ const resolvers = {
 
         // Reset unread count for user
         const unreadCount = chat.unreadCounts.find(uc => 
-          uc.user.toString() === user.id
+          uc.userId.toString() === user.id
         );
         if (unreadCount) {
           unreadCount.count = 0;
           await chat.save();
         }
-
-        // Mark all messages as read
-        await Message.updateMany(
-          {
-            chat: chatId,
-            'readBy.user': { $ne: user.id }
-          },
-          {
-            $push: {
-              readBy: {
-                user: user.id,
-                readAt: new Date()
-              }
-            }
-          }
-        );
-
-        pubsub.publish('CHAT_UPDATED', {
-          chatUpdated: chat
-        });
 
         return true;
       } catch (error) {
@@ -286,7 +253,9 @@ const resolvers = {
 
         if (!message) throw new UserInputError('Message not found');
 
-        await message.markAsDeleted();
+        message.isDeleted = true;
+        message.deletedAt = new Date().toISOString();
+        await message.save();
 
         pubsub.publish('MESSAGE_UPDATED', {
           messageUpdated: message
@@ -318,7 +287,7 @@ const resolvers = {
 
         // Remove user's unread count
         chat.unreadCounts = chat.unreadCounts.filter(
-          uc => uc.user.toString() !== user.id
+          uc => uc.userId.toString() !== user.id
         );
 
         await chat.save();
