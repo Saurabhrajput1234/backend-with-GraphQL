@@ -1,0 +1,68 @@
+type User {
+  id: ID!
+  username: String!
+  email: String!
+  fullName: String!
+  bio: String
+  avatar: String
+  followers: [User!]!
+  following: [User!]!
+  postCount: Int!
+  isVerified: Boolean!
+  lastActive: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+input CreateUserInput {
+  username: String!
+  email: String!
+  password: String!
+  fullName: String!
+  bio: String
+  avatar: String
+}
+
+input UpdateUserInput {
+  username: String
+  email: String
+  fullName: String
+  bio: String
+  avatar: String
+  password: String
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+type Query {
+  me: User
+  user(id: ID!): User
+  userByUsername(username: String!): User
+  searchUsers(query: String!, limit: Int = 10, offset: Int = 0): [User!]!
+}
+
+type Mutation {
+  register(input: CreateUserInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  updateProfile(input: UpdateUserInput!): User!
+  followUser(userId: ID!): User!
+  unfollowUser(userId: ID!): User!
+  verifyEmail(token: String!): Boolean!
+  forgotPassword(email: String!): Boolean!
+  resetPassword(token: String!, password: String!): Boolean!
+  deleteAccount: Boolean!
+}
+
+type Subscription {
+  userUpdated(userId: ID!): User!
+  userFollowed(userId: ID!): User!
+  userUnfollowed(userId: ID!): User!
+} 

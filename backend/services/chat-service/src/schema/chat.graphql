@@ -1,0 +1,112 @@
+type Chat {
+  id: ID!
+  participants: [User!]!
+  type: ChatType!
+  name: String
+  lastMessage: Message
+  unreadCounts: [UnreadCount!]!
+  messageCount: Int!
+  isActive: Boolean!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Message {
+  id: ID!
+  chat: Chat!
+  sender: User!
+  content: String!
+  type: MessageType!
+  fileUrl: String
+  readBy: [ReadReceipt!]!
+  isDeleted: Boolean!
+  deletedAt: String
+  replyTo: Message
+  createdAt: String!
+  updatedAt: String!
+}
+
+type UnreadCount {
+  user: User!
+  count: Int!
+}
+
+type ReadReceipt {
+  user: User!
+  readAt: String!
+}
+
+enum ChatType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+input CreateChatInput {
+  participantIds: [ID!]!
+  type: ChatType!
+  name: String
+}
+
+input SendMessageInput {
+  chatId: ID!
+  content: String!
+  type: MessageType = TEXT
+  fileUrl: String
+  replyToId: ID
+}
+
+input UpdateChatInput {
+  name: String
+  isActive: Boolean
+}
+
+type Query {
+  # Get all chats for current user
+  myChats(limit: Int = 20, offset: Int = 0): [Chat!]!
+  
+  # Get a specific chat
+  chat(id: ID!): Chat!
+  
+  # Get messages for a chat
+  messages(chatId: ID!, limit: Int = 50, offset: Int = 0): [Message!]!
+  
+  # Get unread message count for all chats
+  unreadCounts: [UnreadCount!]!
+}
+
+type Mutation {
+  # Create a new chat
+  createChat(input: CreateChatInput!): Chat!
+  
+  # Send a message
+  sendMessage(input: SendMessageInput!): Message!
+  
+  # Update chat details
+  updateChat(id: ID!, input: UpdateChatInput!): Chat!
+  
+  # Mark messages as read
+  markMessagesAsRead(chatId: ID!): Boolean!
+  
+  # Delete a message
+  deleteMessage(id: ID!): Boolean!
+  
+  # Leave a chat (for group chats)
+  leaveChat(id: ID!): Boolean!
+}
+
+type Subscription {
+  # Subscribe to new messages in a chat
+  messageAdded(chatId: ID!): Message!
+  
+  # Subscribe to chat updates
+  chatUpdated(chatId: ID!): Chat!
+  
+  # Subscribe to message updates (read receipts, deletions)
+  messageUpdated(chatId: ID!): Message!
+} 

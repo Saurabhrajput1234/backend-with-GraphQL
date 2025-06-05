@@ -1,0 +1,234 @@
+type Post {
+  id: ID!
+  author: User!
+  content: String!
+  media: [Media!]
+  likes: [User!]!
+  comments: [Comment!]!
+  shares: [Share!]!
+  mentions: [User!]!
+  hashtags: [String!]!
+  location: Location
+  isPrivate: Boolean!
+  isEdited: Boolean!
+  editedAt: String
+  isDeleted: Boolean!
+  deletedAt: String
+  parentPost: Post
+  likeCount: Int!
+  commentCount: Int!
+  shareCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Comment {
+  id: ID!
+  post: Post!
+  author: User!
+  content: String!
+  likes: [User!]!
+  replies: [Comment!]!
+  mentions: [User!]!
+  hashtags: [String!]!
+  isEdited: Boolean!
+  editedAt: String
+  isDeleted: Boolean!
+  deletedAt: String
+  parentComment: Comment
+  likeCount: Int!
+  replyCount: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Media {
+  type: MediaType!
+  url: String!
+  thumbnail: String
+  width: Int
+  height: Int
+  duration: Int
+}
+
+type Share {
+  user: User!
+  sharedAt: String!
+}
+
+type Location {
+  type: String!
+  coordinates: [Float!]!
+  name: String
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+input CreatePostInput {
+  content: String!
+  media: [MediaInput!]
+  mentions: [ID!]
+  hashtags: [String!]
+  location: LocationInput
+  isPrivate: Boolean
+  parentPostId: ID
+}
+
+input UpdatePostInput {
+  content: String
+  media: [MediaInput!]
+  mentions: [ID!]
+  hashtags: [String!]
+  location: LocationInput
+  isPrivate: Boolean
+}
+
+input CreateCommentInput {
+  postId: ID!
+  content: String!
+  mentions: [ID!]
+  hashtags: [String!]
+  parentCommentId: ID
+}
+
+input UpdateCommentInput {
+  content: String!
+  mentions: [ID!]
+  hashtags: [String!]
+}
+
+input MediaInput {
+  type: MediaType!
+  url: String!
+  thumbnail: String
+  width: Int
+  height: Int
+  duration: Int
+}
+
+input LocationInput {
+  coordinates: [Float!]!
+  name: String
+}
+
+input PostFilter {
+  author: ID
+  hashtags: [String!]
+  mentions: [ID!]
+  isPrivate: Boolean
+  location: LocationInput
+  parentPost: ID
+}
+
+input CommentFilter {
+  author: ID
+  post: ID
+  parentComment: ID
+  hashtags: [String!]
+  mentions: [ID!]
+}
+
+type Query {
+  # Get posts with pagination and filters
+  posts(
+    limit: Int = 20
+    offset: Int = 0
+    filter: PostFilter
+  ): [Post!]!
+  
+  # Get a specific post
+  post(id: ID!): Post!
+  
+  # Get user's posts
+  userPosts(
+    userId: ID!
+    limit: Int = 20
+    offset: Int = 0
+  ): [Post!]!
+  
+  # Get feed posts (posts from followed users)
+  feedPosts(
+    limit: Int = 20
+    offset: Int = 0
+  ): [Post!]!
+  
+  # Get comments for a post
+  comments(
+    postId: ID!
+    limit: Int = 20
+    offset: Int = 0
+    filter: CommentFilter
+  ): [Comment!]!
+  
+  # Get a specific comment
+  comment(id: ID!): Comment!
+  
+  # Get replies for a comment
+  commentReplies(
+    commentId: ID!
+    limit: Int = 20
+    offset: Int = 0
+  ): [Comment!]!
+  
+  # Search posts
+  searchPosts(
+    query: String!
+    limit: Int = 20
+    offset: Int = 0
+  ): [Post!]!
+  
+  # Get trending hashtags
+  trendingHashtags(limit: Int = 10): [String!]!
+}
+
+type Mutation {
+  # Create a new post
+  createPost(input: CreatePostInput!): Post!
+  
+  # Update a post
+  updatePost(id: ID!, input: UpdatePostInput!): Post!
+  
+  # Delete a post
+  deletePost(id: ID!): Boolean!
+  
+  # Like/Unlike a post
+  togglePostLike(id: ID!): Post!
+  
+  # Share a post
+  sharePost(id: ID!): Post!
+  
+  # Create a comment
+  createComment(input: CreateCommentInput!): Comment!
+  
+  # Update a comment
+  updateComment(id: ID!, input: UpdateCommentInput!): Comment!
+  
+  # Delete a comment
+  deleteComment(id: ID!): Boolean!
+  
+  # Like/Unlike a comment
+  toggleCommentLike(id: ID!): Comment!
+}
+
+type Subscription {
+  # Subscribe to new posts
+  postAdded: Post!
+  
+  # Subscribe to post updates
+  postUpdated: Post!
+  
+  # Subscribe to post deletions
+  postDeleted: ID!
+  
+  # Subscribe to new comments
+  commentAdded: Comment!
+  
+  # Subscribe to comment updates
+  commentUpdated: Comment!
+  
+  # Subscribe to comment deletions
+  commentDeleted: ID!
+} 

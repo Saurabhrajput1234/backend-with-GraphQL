@@ -1,0 +1,67 @@
+type Notification {
+  id: ID!
+  recipient: User!
+  sender: User
+  type: NotificationType!
+  post: Post
+  comment: Comment
+  chat: Chat
+  message: Message
+  isRead: Boolean!
+  createdAt: String!
+  updatedAt: String!
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+  MENTION
+  SHARE
+  MESSAGE
+  SYSTEM
+}
+
+input NotificationFilter {
+  type: NotificationType
+  isRead: Boolean
+  fromDate: String
+  toDate: String
+}
+
+type Query {
+  # Get notifications for current user
+  myNotifications(
+    limit: Int = 20
+    offset: Int = 0
+    filter: NotificationFilter
+  ): [Notification!]!
+  
+  # Get unread notification count
+  unreadCount: Int!
+}
+
+type Mutation {
+  # Mark notification as read
+  markAsRead(id: ID!): Notification!
+  
+  # Mark all notifications as read
+  markAllAsRead: Boolean!
+  
+  # Delete a notification
+  deleteNotification(id: ID!): Boolean!
+  
+  # Delete all notifications
+  deleteAllNotifications: Boolean!
+}
+
+type Subscription {
+  # Subscribe to new notifications
+  notificationAdded: Notification!
+  
+  # Subscribe to notification updates (read status)
+  notificationUpdated: Notification!
+  
+  # Subscribe to notification deletions
+  notificationDeleted: ID!
+} 

@@ -1,0 +1,43 @@
+{
+  "name": "threads-clone-backend",
+  "version": "1.0.0",
+  "description": "Backend services for Threads Clone App",
+  "type": "module",
+  "scripts": {
+    "install:all": "npm install && npm run install:services && npm run install:gateway && npm run install:shared",
+    "install:services": "npm run install:auth && npm run install:chat && npm run install:notification && npm run install:post",
+    "install:auth": "cd services/auth-service && npm install",
+    "install:chat": "cd services/chat-service && npm install",
+    "install:notification": "cd services/notification-service && npm install",
+    "install:post": "cd services/post-service && npm install",
+    "install:gateway": "cd gateway && npm install",
+    "install:shared": "cd shared && npm install",
+    "start": "concurrently \"npm run start:gateway\" \"npm run start:services\"",
+    "start:services": "concurrently \"npm run start:auth\" \"npm run start:chat\" \"npm run start:notification\" \"npm run start:post\"",
+    "start:gateway": "cd gateway && npm start",
+    "start:auth": "cd services/auth-service && npm start",
+    "start:chat": "cd services/chat-service && npm start",
+    "start:notification": "cd services/notification-service && npm start",
+    "start:post": "cd services/post-service && npm start",
+    "dev": "concurrently \"npm run dev:gateway\" \"npm run dev:services\"",
+    "dev:services": "concurrently \"npm run dev:auth\" \"npm run dev:chat\" \"npm run dev:notification\" \"npm run dev:post\"",
+    "dev:gateway": "cd gateway && npm run dev",
+    "dev:auth": "cd services/auth-service && npm run dev",
+    "dev:chat": "cd services/chat-service && npm run dev",
+    "dev:notification": "cd services/notification-service && npm run dev",
+    "dev:post": "cd services/post-service && npm run dev",
+    "lint": "npm run lint:services && npm run lint:gateway && npm run lint:shared",
+    "lint:services": "concurrently \"npm run lint:auth\" \"npm run lint:chat\" \"npm run lint:notification\" \"npm run lint:post\"",
+    "lint:gateway": "cd gateway && npm run lint",
+    "lint:shared": "cd shared && npm run lint",
+    "lint:auth": "cd services/auth-service && npm run lint",
+    "lint:chat": "cd services/chat-service && npm run lint",
+    "lint:notification": "cd services/notification-service && npm run lint",
+    "lint:post": "cd services/post-service && npm run lint",
+    "format": "prettier --write \"**/*.{js,json,md}\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prettier": "^3.2.5"
+  }
+} 
